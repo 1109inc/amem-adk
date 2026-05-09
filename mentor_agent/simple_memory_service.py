@@ -27,7 +27,7 @@ class SimpleMemoryService(BaseMemoryService):
     def __init__(self):
         self._memories: Dict[tuple[str, str], List[MemoryNote]] = {}
         self._extractor = SimpleNoteExtractor()
-        
+
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
 
@@ -72,13 +72,11 @@ class SimpleMemoryService(BaseMemoryService):
         memories = self._memories.get(key, [])
 
         query_lower = query.lower()
-
         matches = [
             note
             for note in memories
-            if query_lower in note.content.lower()
+            if query_lower in self._searchable_text(note).lower()
         ]
-
         entries = [
             MemoryEntry(
                 content=types.Content(
@@ -106,4 +104,13 @@ class SimpleMemoryService(BaseMemoryService):
             f"Tags: {note.tags}\n"
             f"Context: {note.context}\n"
             f"Links: {note.links}"
+        )
+    def _searchable_text(self, note: MemoryNote) -> str:
+        return " ".join(
+            [
+                note.content,
+                " ".join(note.keywords),
+                " ".join(note.tags),
+                note.context,
+            ]
         )

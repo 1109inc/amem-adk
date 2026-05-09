@@ -41,7 +41,7 @@ async def main():
     result = await memory_service.search_memory(
         app_name="amem_demo",
         user_id="pragat",
-        query="A-Mem",
+        query="career_project",
     )
 
     print("Search results:")
