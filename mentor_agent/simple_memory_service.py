@@ -79,6 +79,11 @@ class SimpleMemoryService(BaseMemoryService):
                 existing_notes=self._memories[key],
             )
 
+            self._evolve_related_memories(
+                new_note=note,
+                existing_notes=self._memories[key],
+            )
+
             self._memories[key].append(note)
 
     async def search_memory(
@@ -198,3 +203,24 @@ class SimpleMemoryService(BaseMemoryService):
 
         expanded.sort(key=lambda item: item[0], reverse=True)
         return expanded
+    def _evolve_related_memories(
+        self,
+        new_note: MemoryNote,
+        existing_notes: List[MemoryNote],
+    ) -> None:
+        for linked_id in new_note.links:
+            old_note = self._get_note_by_id(existing_notes, linked_id)
+
+            if old_note is None:
+                continue
+
+            merged_keywords = sorted(set(old_note.keywords + new_note.keywords))
+            merged_tags = sorted(set(old_note.tags + new_note.tags))
+
+            old_note.keywords = merged_keywords
+            old_note.tags = merged_tags
+
+            old_note.context = (
+                "This memory is connected to related memories about "
+                f"keywords={merged_keywords} and tags={merged_tags}."
+            )
