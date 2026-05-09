@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from mentor_agent.note_extractor import SimpleNoteExtractor
 from typing import Dict, List
 from uuid import uuid4
 
@@ -26,7 +26,8 @@ class SimpleMemoryService(BaseMemoryService):
 
     def __init__(self):
         self._memories: Dict[tuple[str, str], List[MemoryNote]] = {}
-
+        self._extractor = SimpleNoteExtractor()
+        
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
 
@@ -46,14 +47,17 @@ class SimpleMemoryService(BaseMemoryService):
                 continue
 
             content = " ".join(text_parts)
-
             note = MemoryNote(
                 id=str(uuid4()),
                 app_name=session.app_name,
                 user_id=session.user_id,
                 author=event.author,
                 content=content,
+                keywords=self._extractor.extract_keywords(content),
+                tags=self._extractor.extract_tags(content),
+                context=self._extractor.create_context(content),
             )
+            
 
             self._memories[key].append(note)
 
