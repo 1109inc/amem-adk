@@ -152,8 +152,8 @@ class AMemMemoryService(BaseMemoryService):
             f"Tags: {note.tags}\n"
             f"Context: {note.context}\n"
             f"Embedding dimensions: {len(note.embedding)}\n"
-            f"Links: {note.links}"
-            f"Revision count: {revision_count}"
+            f"Links: {note.links}\n"
+            f"Revision count: {revision_count}\n"
 
         )
     
