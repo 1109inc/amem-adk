@@ -10,7 +10,7 @@ from google.adk.memory.base_memory_service import (
 )
 from google.adk.sessions import Session
 from google.genai import types
-
+from mentor_agent.similarity import cosine_similarity
 from mentor_agent.memory_note import MemoryNote
 from mentor_agent.embedding_service import EmbeddingService
 
@@ -28,6 +28,7 @@ class SimpleMemoryService(BaseMemoryService):
         self._memories: Dict[tuple[str, str], List[MemoryNote]] = {}
         self._extractor = SimpleNoteExtractor()
         self._embedder = EmbeddingService()
+        self._link_threshold = 0.65
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -71,6 +72,11 @@ class SimpleMemoryService(BaseMemoryService):
                 tags=tags,
                 context=context,
                 embedding=self._embedder.embed_text(embedding_text),
+            )
+
+            self._link_related_memories(
+                new_note=note,
+                existing_notes=self._memories[key],
             )
 
             self._memories[key].append(note)
@@ -142,3 +148,17 @@ class SimpleMemoryService(BaseMemoryService):
                 note.context,
             ]
         )
+    def _link_related_memories(
+        self,
+        new_note: MemoryNote,
+        existing_notes: List[MemoryNote],
+    ) -> None:
+        for old_note in existing_notes:
+            score = cosine_similarity(new_note.embedding, old_note.embedding)
+
+            if score >= self._link_threshold:
+                if old_note.id not in new_note.links:
+                    new_note.links.append(old_note.id)
+
+                if new_note.id not in old_note.links:
+                    old_note.links.append(new_note.id)
