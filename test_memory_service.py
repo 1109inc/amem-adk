@@ -2,11 +2,11 @@ import asyncio
 from types import SimpleNamespace
 
 from google.genai import types
-from mentor_agent.simple_memory_service import SimpleMemoryService
+from mentor_agent.amem_memory_service import AMemMemoryService
 
 
 async def main():
-    memory_service = SimpleMemoryService()
+    memory_service = AMemMemoryService()
 
     fake_session = SimpleNamespace(
         app_name="amem_demo",

@@ -14,14 +14,18 @@ from mentor_agent.similarity import cosine_similarity
 from mentor_agent.memory_note import MemoryNote
 from mentor_agent.embedding_service import EmbeddingService
 
-class SimpleMemoryService(BaseMemoryService):
+class AMemMemoryService(BaseMemoryService):
     """
-    A tiny structured memory service.
+    A custom ADK memory service inspired by A-Mem.
 
-    It stores A-Mem-style MemoryNote objects in memory:
-      (app_name, user_id) -> list[MemoryNote]
-
-    Still no vector search, links, or evolution yet.
+    Current features:
+    - structured MemoryNote storage
+    - rule-based keyword/tag/context extraction
+    - Gemini embeddings
+    - semantic retrieval with cosine similarity
+    - similarity-based link generation
+    - graph-expanded retrieval
+    - simple rule-based memory evolution
     """
 
     def __init__(self):

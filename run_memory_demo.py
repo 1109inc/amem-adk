@@ -5,7 +5,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 from mentor_agent.agent import root_agent
-from mentor_agent.simple_memory_service import SimpleMemoryService
+from mentor_agent.amem_memory_service import AMemMemoryService
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -37,7 +37,7 @@ async def send_message(runner: Runner, text: str):
 
 async def main():
     session_service = InMemorySessionService()
-    memory_service = SimpleMemoryService()
+    memory_service = AMemMemoryService()
 
     await session_service.create_session(
         app_name=APP_NAME,
