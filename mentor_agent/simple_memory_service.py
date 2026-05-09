@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Dict, List
+from uuid import uuid4
 
 from google.adk.memory.base_memory_service import (
     BaseMemoryService,
@@ -10,19 +11,21 @@ from google.adk.memory.base_memory_service import (
 from google.adk.sessions import Session
 from google.genai import types
 
+from mentor_agent.memory_note import MemoryNote
+
 
 class SimpleMemoryService(BaseMemoryService):
     """
-    A tiny memory service for learning.
+    A tiny structured memory service.
 
-    It stores plain text memories in a Python dict:
-      (app_name, user_id) -> list[str]
+    It stores A-Mem-style MemoryNote objects in memory:
+      (app_name, user_id) -> list[MemoryNote]
 
-    Later, we will replace this with A-Mem notes.
+    Still no embeddings, links, or evolution yet.
     """
 
     def __init__(self):
-        self._memories: Dict[tuple[str, str], List[str]] = {}
+        self._memories: Dict[tuple[str, str], List[MemoryNote]] = {}
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -39,9 +42,20 @@ class SimpleMemoryService(BaseMemoryService):
                 if getattr(part, "text", None):
                     text_parts.append(part.text)
 
-            if text_parts:
-                memory_text = f"{event.author}: {' '.join(text_parts)}"
-                self._memories[key].append(memory_text)
+            if not text_parts:
+                continue
+
+            content = " ".join(text_parts)
+
+            note = MemoryNote(
+                id=str(uuid4()),
+                app_name=session.app_name,
+                user_id=session.user_id,
+                author=event.author,
+                content=content,
+            )
+
+            self._memories[key].append(note)
 
     async def search_memory(
         self,
@@ -56,20 +70,36 @@ class SimpleMemoryService(BaseMemoryService):
         query_lower = query.lower()
 
         matches = [
-            memory
-            for memory in memories
-            if query_lower in memory.lower()
+            note
+            for note in memories
+            if query_lower in note.content.lower()
         ]
 
         entries = [
             MemoryEntry(
                 content=types.Content(
                     role="model",
-                    parts=[types.Part(text=memory)],
+                    parts=[
+                        types.Part(
+                            text=self._format_note_for_agent(note)
+                        )
+                    ],
                 ),
                 author="simple_memory",
             )
-            for memory in matches[:5]
+            for note in matches[:5]
         ]
 
         return SearchMemoryResponse(memories=entries)
+
+    def _format_note_for_agent(self, note: MemoryNote) -> str:
+        return (
+            f"Memory ID: {note.id}\n"
+            f"Author: {note.author}\n"
+            f"Time: {note.timestamp.isoformat()}\n"
+            f"Content: {note.content}\n"
+            f"Keywords: {note.keywords}\n"
+            f"Tags: {note.tags}\n"
+            f"Context: {note.context}\n"
+            f"Links: {note.links}"
+        )
