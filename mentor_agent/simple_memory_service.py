@@ -2,7 +2,7 @@ from __future__ import annotations
 from mentor_agent.note_extractor import SimpleNoteExtractor
 from typing import Dict, List
 from uuid import uuid4
-
+from mentor_agent.similarity import cosine_similarity
 from google.adk.memory.base_memory_service import (
     BaseMemoryService,
     SearchMemoryResponse,
@@ -85,25 +85,37 @@ class SimpleMemoryService(BaseMemoryService):
         key = (app_name, user_id)
         memories = self._memories.get(key, [])
 
-        query_lower = query.lower()
-        matches = [
-            note
-            for note in memories
-            if query_lower in self._searchable_text(note).lower()
+        if not memories:
+            return SearchMemoryResponse(memories=[])
+
+        query_embedding = self._embedder.embed_text(query)
+
+        scored_notes = []
+        for note in memories:
+            score = cosine_similarity(query_embedding, note.embedding)
+            scored_notes.append((score, note))
+
+        scored_notes.sort(key=lambda item: item[0], reverse=True)
+
+        top_notes = [
+            (score, note)
+            for score, note in scored_notes[:5]
+            if score > 0.2
         ]
+
         entries = [
             MemoryEntry(
                 content=types.Content(
                     role="model",
                     parts=[
                         types.Part(
-                            text=self._format_note_for_agent(note)
+                            text=f"Similarity Score: {score:.4f}\n{self._format_note_for_agent(note)}"
                         )
-                    ],
+                    ]
                 ),
                 author="simple_memory",
             )
-            for note in matches[:5]
+            for score, note in top_notes
         ]
 
         return SearchMemoryResponse(memories=entries)
