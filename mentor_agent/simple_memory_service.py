@@ -108,7 +108,10 @@ class SimpleMemoryService(BaseMemoryService):
             for score, note in scored_notes[:5]
             if score > 0.2
         ]
-
+        expanded_notes = self._expand_with_linked_memories(
+            top_notes=top_notes,
+            all_notes=memories,
+        )
         entries = [
             MemoryEntry(
                 content=types.Content(
@@ -121,7 +124,7 @@ class SimpleMemoryService(BaseMemoryService):
                 ),
                 author="simple_memory",
             )
-            for score, note in top_notes
+            for score, note in expanded_notes[:5]
         ]
 
         return SearchMemoryResponse(memories=entries)
@@ -162,3 +165,36 @@ class SimpleMemoryService(BaseMemoryService):
 
                 if new_note.id not in old_note.links:
                     old_note.links.append(new_note.id)
+    def _get_note_by_id(
+        self,
+        notes: List[MemoryNote],
+        note_id: str,
+    ) -> MemoryNote | None:
+        for note in notes:
+            if note.id == note_id:
+                return note
+        return None
+    def _expand_with_linked_memories(
+        self,
+        top_notes: list[tuple[float, MemoryNote]],
+        all_notes: List[MemoryNote],
+    ) -> list[tuple[float, MemoryNote]]:
+        expanded: list[tuple[float, MemoryNote]] = []
+        seen_ids: set[str] = set()
+
+        for score, note in top_notes:
+            if note.id not in seen_ids:
+                expanded.append((score, note))
+                seen_ids.add(note.id)
+
+            for linked_id in note.links:
+                linked_note = self._get_note_by_id(all_notes, linked_id)
+
+                if linked_note and linked_note.id not in seen_ids:
+                    # Linked memories get a slightly lower score because they were
+                    # not directly retrieved by the query.
+                    expanded.append((score * 0.9, linked_note))
+                    seen_ids.add(linked_note.id)
+
+        expanded.sort(key=lambda item: item[0], reverse=True)
+        return expanded
