@@ -13,6 +13,7 @@ from google.genai import types
 from mentor_agent.similarity import cosine_similarity
 from mentor_agent.memory_note import MemoryNote
 from mentor_agent.embedding_service import EmbeddingService
+from mentor_agent.memory_revision import MemoryRevision
 
 class AMemMemoryService(BaseMemoryService):
     """
@@ -33,6 +34,7 @@ class AMemMemoryService(BaseMemoryService):
         self._extractor = SimpleNoteExtractor()
         self._embedder = EmbeddingService()
         self._link_threshold = 0.65
+        self._revisions: Dict[str, List[MemoryRevision]] = {}
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -139,6 +141,8 @@ class AMemMemoryService(BaseMemoryService):
         return SearchMemoryResponse(memories=entries)
 
     def _format_note_for_agent(self, note: MemoryNote) -> str:
+        revision_count = len(self._revisions.get(note.id, []))
+
         return (
             f"Memory ID: {note.id}\n"
             f"Author: {note.author}\n"
@@ -149,6 +153,8 @@ class AMemMemoryService(BaseMemoryService):
             f"Context: {note.context}\n"
             f"Embedding dimensions: {len(note.embedding)}\n"
             f"Links: {note.links}"
+            f"Revision count: {revision_count}"
+
         )
     
     def _searchable_text(self, note: MemoryNote) -> str:
@@ -218,13 +224,44 @@ class AMemMemoryService(BaseMemoryService):
             if old_note is None:
                 continue
 
+            old_keywords = list(old_note.keywords)
+            old_tags = list(old_note.tags)
+            old_context = old_note.context
+
             merged_keywords = sorted(set(old_note.keywords + new_note.keywords))
             merged_tags = sorted(set(old_note.tags + new_note.tags))
 
-            old_note.keywords = merged_keywords
-            old_note.tags = merged_tags
-
-            old_note.context = (
+            new_context = (
                 "This memory is connected to related memories about "
                 f"keywords={merged_keywords} and tags={merged_tags}."
             )
+
+            # If nothing changed, do not create a revision.
+            if (
+                old_keywords == merged_keywords
+                and old_tags == merged_tags
+                and old_context == new_context
+            ):
+                continue
+
+            revision = MemoryRevision(
+                id=str(uuid4()),
+                memory_id=old_note.id,
+                triggered_by_memory_id=new_note.id,
+                old_keywords=old_keywords,
+                new_keywords=merged_keywords,
+                old_tags=old_tags,
+                new_tags=merged_tags,
+                old_context=old_context,
+                new_context=new_context,
+                reason="Memory evolved because a newly linked memory introduced related metadata.",
+            )
+
+            if old_note.id not in self._revisions:
+                self._revisions[old_note.id] = []
+
+            self._revisions[old_note.id].append(revision)
+
+            old_note.keywords = merged_keywords
+            old_note.tags = merged_tags
+            old_note.context = new_context
