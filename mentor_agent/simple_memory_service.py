@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from google.adk.memory import BaseMemoryService, SearchMemoryResponse, MemoryEntry
+from google.adk.memory.base_memory_service import (
+    BaseMemoryService,
+    SearchMemoryResponse,
+    MemoryEntry,
+)
 from google.adk.sessions import Session
 from google.genai import types
 
