@@ -11,7 +11,7 @@ class MemoryNote(BaseModel):
     author: str
     content: str
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
+    embedding: list[float] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     context: str = ""

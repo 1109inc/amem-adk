@@ -12,7 +12,7 @@ from google.adk.sessions import Session
 from google.genai import types
 
 from mentor_agent.memory_note import MemoryNote
-
+from mentor_agent.embedding_service import EmbeddingService
 
 class SimpleMemoryService(BaseMemoryService):
     """
@@ -21,12 +21,13 @@ class SimpleMemoryService(BaseMemoryService):
     It stores A-Mem-style MemoryNote objects in memory:
       (app_name, user_id) -> list[MemoryNote]
 
-    Still no embeddings, links, or evolution yet.
+    Still no vector search, links, or evolution yet.
     """
 
     def __init__(self):
         self._memories: Dict[tuple[str, str], List[MemoryNote]] = {}
         self._extractor = SimpleNoteExtractor()
+        self._embedder = EmbeddingService()
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -47,17 +48,30 @@ class SimpleMemoryService(BaseMemoryService):
                 continue
 
             content = " ".join(text_parts)
+
+            keywords = self._extractor.extract_keywords(content)
+            tags = self._extractor.extract_tags(content)
+            context = self._extractor.create_context(content)
+
+            embedding_text = " ".join(
+                [
+                    content,
+                    " ".join(keywords),
+                    " ".join(tags),
+                    context,
+                ]
+            )
             note = MemoryNote(
                 id=str(uuid4()),
                 app_name=session.app_name,
                 user_id=session.user_id,
                 author=event.author,
                 content=content,
-                keywords=self._extractor.extract_keywords(content),
-                tags=self._extractor.extract_tags(content),
-                context=self._extractor.create_context(content),
+                keywords=keywords,
+                tags=tags,
+                context=context,
+                embedding=self._embedder.embed_text(embedding_text),
             )
-            
 
             self._memories[key].append(note)
 
@@ -103,8 +117,10 @@ class SimpleMemoryService(BaseMemoryService):
             f"Keywords: {note.keywords}\n"
             f"Tags: {note.tags}\n"
             f"Context: {note.context}\n"
+            f"Embedding dimensions: {len(note.embedding)}\n"
             f"Links: {note.links}"
         )
+    
     def _searchable_text(self, note: MemoryNote) -> str:
         return " ".join(
             [
