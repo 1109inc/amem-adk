@@ -27,5 +27,7 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def init_db() -> None:
+    import mentor_agent.db_models  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
