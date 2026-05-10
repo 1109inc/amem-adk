@@ -73,6 +73,8 @@ async def main():
             print(f"  New keywords: {revision.new_keywords}")
             print(f"  Old tags: {revision.old_tags}")
             print(f"  New tags: {revision.new_tags}")
+            print(f"  Old context: {revision.old_context}")
+            print(f"  New context: {revision.new_context}")
             print(f"  Reason: {revision.reason}")
 
 
