@@ -34,7 +34,9 @@ class MemoryNoteRecord(Base):
     last_accessed_at: Mapped[DateTime | None] = mapped_column(DateTime, nullable=True)
     access_count: Mapped[int] = mapped_column(Integer)
     expires_at: Mapped[DateTime | None] = mapped_column(DateTime, nullable=True)
-
+    importance: Mapped[float] = mapped_column(Float)
+    memory_strength: Mapped[float] = mapped_column(Float)
+    retention_score: Mapped[float] = mapped_column(Float)
 
 class MemoryLinkRecord(Base):
     __tablename__ = "memory_links"

@@ -31,3 +31,6 @@ class MemoryNote(BaseModel):
     last_accessed_at: datetime | None = None
     access_count: int = 0
     expires_at: datetime | None = None
+    importance: float = 0.5
+    memory_strength: float = 1.0
+    retention_score: float = 1.0

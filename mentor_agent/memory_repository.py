@@ -37,6 +37,9 @@ class MemoryRepository:
                 last_accessed_at=note.last_accessed_at,
                 access_count=note.access_count,
                 expires_at=note.expires_at,
+                importance=note.importance,
+                memory_strength=note.memory_strength,
+                retention_score=note.retention_score,
             )
 
             await session.merge(record)
@@ -75,6 +78,9 @@ class MemoryRepository:
                     last_accessed_at=record.last_accessed_at,
                     access_count=record.access_count,
                     expires_at=record.expires_at,
+                    importance=record.importance,
+                    memory_strength=record.memory_strength,
+                    retention_score=record.retention_score,
                 )
                 for record in records
             ]

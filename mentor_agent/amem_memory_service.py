@@ -155,6 +155,7 @@ class AMemMemoryService(BaseMemoryService):
         for _, note in returned_notes:
             note.access_count += 1
             note.last_accessed_at = now
+            note.memory_strength += 1.0
             await self._repo.save_note(note)
         entries = [
             MemoryEntry(
@@ -196,7 +197,9 @@ class AMemMemoryService(BaseMemoryService):
             f"Access count: {note.access_count}\n"
             f"Last accessed at: {note.last_accessed_at}\n"
             f"Expires at: {note.expires_at}\n"
-
+            f"Importance: {note.importance}\n"
+            f"Memory strength: {note.memory_strength}\n"
+            f"Retention score: {note.retention_score}\n"
         )
     
     def _searchable_text(self, note: MemoryNote) -> str:
