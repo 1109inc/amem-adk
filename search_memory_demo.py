@@ -9,7 +9,7 @@ USER_ID = "pragat"
 
 async def main():
     memory_service = AMemMemoryService()
-
+    await memory_service.initialize()
     query = "compare long term memory systems"
 
     result = await memory_service.search_memory(

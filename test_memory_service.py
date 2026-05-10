@@ -7,7 +7,8 @@ from mentor_agent.amem_memory_service import AMemMemoryService
 
 async def main():
     memory_service = AMemMemoryService()
-
+    await memory_service.initialize()
+    
     fake_session = SimpleNamespace(
         app_name="amem_demo",
         user_id="pragat",

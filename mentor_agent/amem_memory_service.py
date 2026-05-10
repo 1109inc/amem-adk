@@ -15,6 +15,7 @@ from mentor_agent.embedding_service import EmbeddingService
 from mentor_agent.memory_revision import MemoryRevision
 from mentor_agent.memory_link import MemoryLink
 from mentor_agent.memory_repository import MemoryRepository
+from mentor_agent.database import init_db
 
 class AMemMemoryService(BaseMemoryService):
     """
@@ -341,3 +342,5 @@ class AMemMemoryService(BaseMemoryService):
             return links
 
         return self._links.get(memory_id, [])
+    async def initialize(self) -> None:
+        await init_db()

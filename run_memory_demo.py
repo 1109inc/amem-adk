@@ -38,7 +38,7 @@ async def send_message(runner: Runner, text: str):
 async def main():
     session_service = InMemorySessionService()
     memory_service = AMemMemoryService()
-
+    await memory_service.initialize()
     await session_service.create_session(
         app_name=APP_NAME,
         user_id=USER_ID,
