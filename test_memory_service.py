@@ -59,7 +59,7 @@ async def main():
         )
         memory_id = memory_id_line.replace("Memory ID:", "").strip()
 
-        revisions = memory_service.get_revision_history(memory_id)
+        revisions = await memory_service.get_revision_history(memory_id)
 
         if not revisions:
             continue
@@ -88,7 +88,7 @@ async def main():
         )
         memory_id = memory_id_line.replace("Memory ID:", "").strip()
 
-        links = memory_service.get_links(memory_id)
+        links = await memory_service.get_links(memory_id)
 
         if not links:
             continue

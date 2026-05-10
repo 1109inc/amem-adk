@@ -10,11 +10,11 @@ from google.adk.memory.base_memory_service import (
 )
 from google.adk.sessions import Session
 from google.genai import types
-from mentor_agent.similarity import cosine_similarity
 from mentor_agent.memory_note import MemoryNote
 from mentor_agent.embedding_service import EmbeddingService
 from mentor_agent.memory_revision import MemoryRevision
 from mentor_agent.memory_link import MemoryLink
+from mentor_agent.memory_repository import MemoryRepository
 
 class AMemMemoryService(BaseMemoryService):
     """
@@ -37,6 +37,7 @@ class AMemMemoryService(BaseMemoryService):
         self._link_threshold = 0.65
         self._revisions: Dict[str, List[MemoryRevision]] = {}
         self._links: Dict[str, List[MemoryLink]] = {}
+        self._repo = MemoryRepository()
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -82,18 +83,18 @@ class AMemMemoryService(BaseMemoryService):
                 embedding=self._embedder.embed_text(embedding_text),
             )
 
-            self._link_related_memories(
+            await self._link_related_memories(
                 new_note=note,
                 existing_notes=self._memories[key],
             )
 
-            self._evolve_related_memories(
+            await self._evolve_related_memories(
                 new_note=note,
                 existing_notes=self._memories[key],
             )
 
             self._memories[key].append(note)
-
+            await self._repo.save_note(note)
     async def search_memory(
         self,
         *,
@@ -102,7 +103,10 @@ class AMemMemoryService(BaseMemoryService):
         query: str,
     ) -> SearchMemoryResponse:
         key = (app_name, user_id)
-        memories = self._memories.get(key, [])
+        memories = await self._repo.load_notes(app_name=app_name, user_id=user_id)
+
+        if not memories:
+            memories = self._memories.get(key, [])
 
         if not memories:
             return SearchMemoryResponse(memories=[])
@@ -177,7 +181,7 @@ class AMemMemoryService(BaseMemoryService):
                 note.context,
             ]
         )
-    def _link_related_memories(
+    async def _link_related_memories(
         self,
         new_note: MemoryNote,
         existing_notes: List[MemoryNote],
@@ -197,19 +201,20 @@ class AMemMemoryService(BaseMemoryService):
                 if new_note.id not in old_note.links:
                     old_note.links.append(new_note.id)
 
-                self._add_link(
+                await self._add_link(
                     source_memory_id=new_note.id,
                     target_memory_id=old_note.id,
                     similarity_score=score,
                     reason=reason,
                 )
 
-                self._add_link(
+                await self._add_link(
                     source_memory_id=old_note.id,
                     target_memory_id=new_note.id,
                     similarity_score=score,
                     reason=reason,
                 )
+                await self._repo.save_note(old_note)
     def _get_note_by_id(
         self,
         notes: List[MemoryNote],
@@ -243,7 +248,7 @@ class AMemMemoryService(BaseMemoryService):
 
         expanded.sort(key=lambda item: item[0], reverse=True)
         return expanded
-    def _evolve_related_memories(
+    async def _evolve_related_memories(
         self,
         new_note: MemoryNote,
         existing_notes: List[MemoryNote],
@@ -291,13 +296,19 @@ class AMemMemoryService(BaseMemoryService):
                 self._revisions[old_note.id] = []
 
             self._revisions[old_note.id].append(revision)
-
+            await self._repo.save_revision(revision)
             old_note.keywords = merged_keywords
             old_note.tags = merged_tags
             old_note.context = new_context
-    def get_revision_history(self, memory_id: str) -> list[MemoryRevision]:
+            await self._repo.save_note(old_note)
+    async def get_revision_history(self, memory_id: str) -> list[MemoryRevision]:
+        revisions = await self._repo.load_revisions(memory_id)
+
+        if revisions:
+            return revisions
+
         return self._revisions.get(memory_id, [])
-    def _add_link(
+    async def _add_link(
         self,
         source_memory_id: str,
         target_memory_id: str,
@@ -322,5 +333,11 @@ class AMemMemoryService(BaseMemoryService):
 
         if not already_exists:
             self._links[source_memory_id].append(link)
-    def get_links(self, memory_id: str) -> list[MemoryLink]:
+            await self._repo.save_link(link)
+    async def get_links(self, memory_id: str) -> list[MemoryLink]:
+        links = await self._repo.load_links(memory_id)
+
+        if links:
+            return links
+
         return self._links.get(memory_id, [])
