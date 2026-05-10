@@ -23,7 +23,8 @@ Build an ADK agent that can remember, connect, retrieve, and evolve project know
 - Automatic database initialization
 - Separate persisted-memory search demo
 - Provenance and lifecycle fields for safer memory design
-
+- ADK `load_memory` tool integration
+- Agent can retrieve long-term memory during conversation through the custom `AMemMemoryService`
 ## Memory Pipeline
 
 1. ADK session events are passed into `AMemMemoryService`.
@@ -37,6 +38,7 @@ Build an ADK agent that can remember, connect, retrieve, and evolve project know
 9. Every evolution creates a `MemoryRevision` record.
 10. Search uses semantic similarity plus graph-expanded retrieval.
 11. Notes, links, and revisions are persisted in SQLite.
+12. The ADK agent can call `load_memory`, which routes memory search through the custom `AMemMemoryService`.
 
 ## Current Safety Design
 
