@@ -68,7 +68,68 @@ def print_response(title: str, response) -> None:
         print("-" * 80)
         print(memory.content.parts[0].text)
 
+async def run_query_group(
+    memory_service: AMemMemoryService,
+    title: str,
+    queries: list[dict],
+) -> tuple[int, int, int]:
+    print("\n" + "#" * 100)
+    print(title)
+    print("#" * 100)
 
+    vector_hits = 0
+    amem_hits = 0
+
+    for item in queries:
+        query = item["query"]
+
+        vector_response = await memory_service.search_memory_vector_only(
+            app_name=APP_NAME,
+            user_id=USER_ID,
+            query=query,
+            top_k=3,
+        )
+
+        amem_response = await memory_service.search_memory(
+            app_name=APP_NAME,
+            user_id=USER_ID,
+            query=query,
+        )
+
+        vector_hit = response_contains_terms(
+            vector_response,
+            item["expected_terms"],
+        )
+        amem_hit = response_contains_terms(
+            amem_response,
+            item["expected_terms"],
+        )
+
+        if vector_hit:
+            vector_hits += 1
+
+        if amem_hit:
+            amem_hits += 1
+
+        print("\n\n" + "#" * 100)
+        print(f"QUERY: {query}")
+        print(f"EXPECTED TERMS: {item['expected_terms']}")
+        print(f"\nVECTOR HIT: {vector_hit}")
+        print(f"A-MEM HIT: {amem_hit}")
+        print("#" * 100)
+
+        print_response("VECTOR-ONLY BASELINE", vector_response)
+        print_response("A-MEM GRAPH RETRIEVAL", amem_response)
+
+    total = len(queries)
+
+    print("\n" + "=" * 80)
+    print(f"{title} SUMMARY")
+    print("=" * 80)
+    print(f"Vector-only hits: {vector_hits}/{total}")
+    print(f"A-Mem hits: {amem_hits}/{total}")
+
+    return vector_hits, amem_hits, total
 async def main():
     # Optional: remove old eval DB for clean results.
     # We use the same SQLite DB, but separate app/user scope.
@@ -128,46 +189,60 @@ async def main():
             "expected_terms": ["architecture tradeoffs", "evaluation", "explainable", "revisions"],
         },
     ]
+    multi_hop_queries = [
+    {
+        "query": "Why is Vertex relevant to my interview-ready A-Mem project?",
+        "expected_terms": [
+            "Vertex AI Memory Bank",
+            "black-box",
+            "interview",
+            "evaluation",
+        ],
+    },
+    {
+        "query": "How does MemoryBank connect to my forgetting design?",
+        "expected_terms": [
+            "MemoryBank",
+            "forgetting",
+            "Ebbinghaus",
+            "retention curve",
+        ],
+    },
+    {
+        "query": "What makes my A-Mem project more than simple vector search?",
+        "expected_terms": [
+            "structured memory notes",
+            "semantic links",
+            "graph-expanded retrieval",
+            "memory evolution",
+        ],
+    },
+]
     vector_hits = 0
     amem_hits = 0
-    for item in test_queries:
-        query = item["query"]
+    direct_vector_hits, direct_amem_hits, direct_total = await run_query_group(
+        memory_service=memory_service,
+        title="DIRECT RETRIEVAL EVALUATION",
+        queries=test_queries,
+    )
 
-        vector_response = await memory_service.search_memory_vector_only(
-            app_name=APP_NAME,
-            user_id=USER_ID,
-            query=query,
-            top_k=3,
-        )
-
-        amem_response = await memory_service.search_memory(
-            app_name=APP_NAME,
-            user_id=USER_ID,
-            query=query,
-        )
-        vector_hit = response_contains_terms(vector_response, item["expected_terms"])
-        amem_hit = response_contains_terms(amem_response, item["expected_terms"])
-        if vector_hit:
-            vector_hits += 1
-
-        if amem_hit:
-            amem_hits += 1
-        print("\n\n" + "#" * 100)
-        print(f"QUERY: {query}")
-        print(f"EXPECTED TERMS: {item['expected_terms']}")
-        print(f"\nVECTOR HIT: {vector_hit}")
-        print(f"A-MEM HIT: {amem_hit}")
-        print("#" * 100)
-
-        print_response("VECTOR-ONLY BASELINE", vector_response)
-        print_response("A-MEM GRAPH RETRIEVAL", amem_response)
-    total = len(test_queries)
+    multi_vector_hits, multi_amem_hits, multi_total = await run_query_group(
+        memory_service=memory_service,
+        title="MULTI-HOP RETRIEVAL EVALUATION",
+        queries=multi_hop_queries,
+    )
 
     print("\n" + "=" * 80)
-    print("EVALUATION SUMMARY")
+    print("OVERALL EVALUATION SUMMARY")
     print("=" * 80)
-    print(f"Vector-only hits: {vector_hits}/{total}")
-    print(f"A-Mem hits: {amem_hits}/{total}")
+    print(
+        f"Vector-only hits: {direct_vector_hits + multi_vector_hits}/"
+        f"{direct_total + multi_total}"
+    )
+    print(
+        f"A-Mem hits: {direct_amem_hits + multi_amem_hits}/"
+        f"{direct_total + multi_total}"
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
