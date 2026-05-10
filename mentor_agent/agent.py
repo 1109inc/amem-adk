@@ -1,5 +1,5 @@
 from google.adk.agents.llm_agent import Agent
-
+from google.adk.tools.load_memory_tool import LoadMemoryTool
 root_agent = Agent(
     model='gemini-flash-lite-latest',
     name='mentor_agent',
@@ -14,5 +14,8 @@ root_agent = Agent(
     For now, you do not have long-term memory.
     Later, you will be connected to a custom A-Mem memory service.
     """,
+    tools=[
+        LoadMemoryTool(),
+    ],
 
 )
