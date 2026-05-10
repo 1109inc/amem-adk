@@ -141,8 +141,12 @@ class AMemMemoryService(BaseMemoryService):
             await self._repo.save_note(note)
         scored_notes = []
         for note in memories:
-            score = cosine_similarity(query_embedding, note.embedding)
-            scored_notes.append((score, note))
+            semantic_score = cosine_similarity(query_embedding, note.embedding)
+            final_score = self._calculate_final_score(
+                semantic_score=semantic_score,
+                note=note,
+            )
+            scored_notes.append((final_score, note))
 
         scored_notes.sort(key=lambda item: item[0], reverse=True)
 
@@ -169,7 +173,7 @@ class AMemMemoryService(BaseMemoryService):
                     role="model",
                     parts=[
                         types.Part(
-                            text=f"Similarity Score: {score:.4f}\n{self._format_note_for_agent(note)}"
+                            text=f"Final Score: {score:.4f}\n{self._format_note_for_agent(note)}"
                         )
                     ]
                 ),
@@ -420,3 +424,14 @@ class AMemMemoryService(BaseMemoryService):
         memory_strength = max(note.memory_strength, 1.0)
 
         return math.exp(-elapsed_days / memory_strength)
+    def _calculate_final_score(
+        self,
+        semantic_score: float,
+        note: MemoryNote,
+    ) -> float:
+        return (
+            semantic_score * 0.75
+            + note.retention_score * 0.10
+            + note.confidence * 0.10
+            + note.importance * 0.05
+        )
