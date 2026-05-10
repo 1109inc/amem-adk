@@ -8,6 +8,7 @@ from google.adk.memory.base_memory_service import (
     SearchMemoryResponse,
     MemoryEntry,
 )
+from mentor_agent.llm_link_judge import LLMLinkJudge
 from google.adk.sessions import Session
 from google.genai import types
 from mentor_agent.memory_note import MemoryNote
@@ -41,6 +42,7 @@ class AMemMemoryService(BaseMemoryService):
         self._links: Dict[str, List[MemoryLink]] = {}
         self._repo = MemoryRepository()
         self._llm_extractor = LLMNoteExtractor()
+        self._link_judge = LLMLinkJudge()
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -199,8 +201,17 @@ class AMemMemoryService(BaseMemoryService):
             score = cosine_similarity(new_note.embedding, old_note.embedding)
 
             if score >= self._link_threshold:
+                judgement = self._link_judge.judge(
+                    new_content=new_note.content,
+                    old_content=old_note.content,
+                    similarity_score=score,
+                )
+                if not judgement.should_link:
+                    continue
+
                 reason = (
-                    "Linked because embedding similarity "
+                    f"Judgement reason: {judgement.reason} "
+
                     f"{score:.4f} exceeded threshold {self._link_threshold}."
                 )
 
