@@ -47,13 +47,19 @@ class AMemMemoryService(BaseMemoryService):
         self._llm_extractor = LLMNoteExtractor()
         self._link_judge = LLMLinkJudge()
         self._memory_evolver = LLMMemoryEvolver()
+        self._duplicate_threshold = 0.92
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
 
         if key not in self._memories:
             self._memories[key] = []
-
+        existing_notes = await self._repo.load_notes(
+            app_name=session.app_name,
+            user_id=session.user_id,
+        )
+        if existing_notes:
+            self._memories[key] = existing_notes
         for event in session.events:
             if not event.content or not event.content.parts:
                 continue
@@ -104,6 +110,18 @@ class AMemMemoryService(BaseMemoryService):
                 confidence=confidence,
 
             )
+            duplicate_note, duplicate_score = self._find_most_similar_memory(
+                new_note=note,
+                existing_notes=self._memories[key],
+            )
+            if duplicate_note is not None and duplicate_score >= self._duplicate_threshold:
+                now = datetime.now(timezone.utc)
+                duplicate_note.access_count += 1
+                duplicate_note.last_accessed_at = now
+                duplicate_note.memory_strength += 1.0
+                duplicate_note.retention_score = self._calculate_retention_score(duplicate_note, now)
+                await self._repo.save_note(duplicate_note)
+                continue
 
             await self._link_related_memories(
                 new_note=note,
@@ -435,3 +453,22 @@ class AMemMemoryService(BaseMemoryService):
             + note.confidence * 0.10
             + note.importance * 0.05
         )
+    def _find_most_similar_memory(
+        self,
+        new_note: MemoryNote,
+        existing_notes: List[MemoryNote],
+    ) -> tuple[MemoryNote | None, float]:
+        best_note = None
+        best_score = 0.0
+
+        for old_note in existing_notes:
+            if not old_note.embedding or len(old_note.embedding) != len(new_note.embedding):
+                continue
+
+            score = cosine_similarity(new_note.embedding, old_note.embedding)
+
+            if score > best_score:
+                best_score = score
+                best_note = old_note
+
+        return best_note, best_score
