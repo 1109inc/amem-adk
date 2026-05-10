@@ -56,3 +56,26 @@ Build an ADK agent that can remember, connect, retrieve, and evolve project know
 - Add MemoryBank-style forgetting / decay
 - Add evaluation against simple vector memory and MemoryBank-style baselines
 - Add a dashboard to inspect notes, links, revisions, and retrieval results
+
+## Evaluation
+
+The project includes a local retrieval evaluation script:
+
+```bash
+python eval_memory_retrieval.py
+```
+### Current evaluation compares:
+
+Vector-only retrieval baseline
+A-Mem graph-expanded retrieval
+
+Initial results:
+
+- Evaluation Type	Vector-only	A-Mem
+- Multi-hop retrieval	2/3	3/3
+- Overall retrieval	6/7	7/7
+
+The direct retrieval queries are easy for both systems, but the multi-hop queries show the benefit of A-Mem graph expansion: linked memories provide supporting context that plain vector retrieval can miss.
+
+
+
