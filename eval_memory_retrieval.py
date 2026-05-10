@@ -67,7 +67,27 @@ def print_response(title: str, response) -> None:
     for memory in response.memories:
         print("-" * 80)
         print(memory.content.parts[0].text)
+def extract_content_from_memory_text(text: str) -> str:
+    for line in text.splitlines():
+        if line.startswith("Content:"):
+            return line.replace("Content:", "").strip()
 
+    return text.splitlines()[0] if text.splitlines() else ""
+def print_compact_response(title: str, response) -> None:
+    print("\n" + title)
+
+    if not response.memories:
+        print("  No memories returned.")
+        return
+
+    for index, memory in enumerate(response.memories, start=1):
+        text = memory.content.parts[0].text
+        content = extract_content_from_memory_text(text)
+
+        if len(content) > 120:
+            content = content[:117] + "..."
+
+        print(f"  {index}. {content}")
 async def run_query_group(
     memory_service: AMemMemoryService,
     title: str,
@@ -118,8 +138,8 @@ async def run_query_group(
         print(f"A-MEM HIT: {amem_hit}")
         print("#" * 100)
 
-        print_response("VECTOR-ONLY BASELINE", vector_response)
-        print_response("A-MEM GRAPH RETRIEVAL", amem_response)
+        print_compact_response("VECTOR-ONLY BASELINE", vector_response)
+        print_compact_response("A-MEM GRAPH RETRIEVAL", amem_response)
 
     total = len(queries)
 
