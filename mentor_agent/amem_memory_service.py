@@ -16,6 +16,7 @@ from mentor_agent.memory_revision import MemoryRevision
 from mentor_agent.memory_link import MemoryLink
 from mentor_agent.memory_repository import MemoryRepository
 from mentor_agent.database import init_db
+from mentor_agent.llm_note_extractor import LLMNoteExtractor
 
 class AMemMemoryService(BaseMemoryService):
     """
@@ -39,6 +40,7 @@ class AMemMemoryService(BaseMemoryService):
         self._revisions: Dict[str, List[MemoryRevision]] = {}
         self._links: Dict[str, List[MemoryLink]] = {}
         self._repo = MemoryRepository()
+        self._llm_extractor = LLMNoteExtractor()
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -60,9 +62,15 @@ class AMemMemoryService(BaseMemoryService):
 
             content = " ".join(text_parts)
 
-            keywords = self._extractor.extract_keywords(content)
-            tags = self._extractor.extract_tags(content)
-            context = self._extractor.create_context(content)
+            try:
+                metadata = self._llm_extractor.extract(content)
+                keywords = metadata.keywords
+                tags = metadata.tags
+                context = metadata.context
+            except Exception:
+                keywords = self._extractor.extract_keywords(content)
+                tags = self._extractor.extract_tags(content)
+                context = self._extractor.create_context(content)
 
             embedding_text = " ".join(
                 [
