@@ -156,6 +156,15 @@ class AMemMemoryService(BaseMemoryService):
             f"Embedding dimensions: {len(note.embedding)}\n"
             f"Links: {note.links}\n"
             f"Revision count: {revision_count}\n"
+            f"Memory type: {note.memory_type}\n"
+            f"Source type: {note.source_type}\n"
+            f"Source ID: {note.source_id}\n"
+            f"Is derived: {note.is_derived}\n"
+            f"Confidence: {note.confidence}\n"
+            f"Evidence memory IDs: {note.evidence_memory_ids}\n"
+            f"Access count: {note.access_count}\n"
+            f"Last accessed at: {note.last_accessed_at}\n"
+            f"Expires at: {note.expires_at}\n"
 
         )
     
