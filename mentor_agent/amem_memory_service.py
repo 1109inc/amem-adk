@@ -265,3 +265,5 @@ class AMemMemoryService(BaseMemoryService):
             old_note.keywords = merged_keywords
             old_note.tags = merged_tags
             old_note.context = new_context
+    def get_revision_history(self, memory_id: str) -> list[MemoryRevision]:
+        return self._revisions.get(memory_id, [])

@@ -48,6 +48,32 @@ async def main():
     for memory in result.memories:
         text = memory.content.parts[0].text
         print("-", text)
+    print("\nRevision histories:")
+
+    for memory in result.memories:
+        text = memory.content.parts[0].text
+        lines = text.splitlines()
+
+        memory_id_line = next(
+            line for line in lines if line.startswith("Memory ID:")
+        )
+        memory_id = memory_id_line.replace("Memory ID:", "").strip()
+
+        revisions = memory_service.get_revision_history(memory_id)
+
+        if not revisions:
+            continue
+
+        print(f"\nMemory {memory_id} revisions:")
+
+        for revision in revisions:
+            print(f"- Revision ID: {revision.id}")
+            print(f"  Triggered by: {revision.triggered_by_memory_id}")
+            print(f"  Old keywords: {revision.old_keywords}")
+            print(f"  New keywords: {revision.new_keywords}")
+            print(f"  Old tags: {revision.old_tags}")
+            print(f"  New tags: {revision.new_tags}")
+            print(f"  Reason: {revision.reason}")
 
 
 if __name__ == "__main__":
