@@ -77,6 +77,29 @@ async def main():
             print(f"  New context: {revision.new_context}")
             print(f"  Reason: {revision.reason}")
 
+        print("\nDetailed links:")
+
+        for memory in result.memories:
+            text = memory.content.parts[0].text
+            lines = text.splitlines()
+
+            memory_id_line = next(
+                line for line in lines if line.startswith("Memory ID:")
+            )
+            memory_id = memory_id_line.replace("Memory ID:", "").strip()
+
+            links = memory_service.get_links(memory_id)
+
+            if not links:
+                continue
+
+            print(f"\nMemory {memory_id} links:")
+
+            for link in links:
+                print(f"- Target: {link.target_memory_id}")
+                print(f"  Similarity: {link.similarity_score:.4f}")
+                print(f"  Reason: {link.reason}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

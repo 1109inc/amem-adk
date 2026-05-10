@@ -14,6 +14,7 @@ from mentor_agent.similarity import cosine_similarity
 from mentor_agent.memory_note import MemoryNote
 from mentor_agent.embedding_service import EmbeddingService
 from mentor_agent.memory_revision import MemoryRevision
+from mentor_agent.memory_link import MemoryLink
 
 class AMemMemoryService(BaseMemoryService):
     """
@@ -35,6 +36,7 @@ class AMemMemoryService(BaseMemoryService):
         self._embedder = EmbeddingService()
         self._link_threshold = 0.65
         self._revisions: Dict[str, List[MemoryRevision]] = {}
+        self._links: Dict[str, List[MemoryLink]] = {}
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -175,11 +177,30 @@ class AMemMemoryService(BaseMemoryService):
             score = cosine_similarity(new_note.embedding, old_note.embedding)
 
             if score >= self._link_threshold:
+                reason = (
+                    "Linked because embedding similarity "
+                    f"{score:.4f} exceeded threshold {self._link_threshold}."
+                )
+
                 if old_note.id not in new_note.links:
                     new_note.links.append(old_note.id)
 
                 if new_note.id not in old_note.links:
                     old_note.links.append(new_note.id)
+
+                self._add_link(
+                    source_memory_id=new_note.id,
+                    target_memory_id=old_note.id,
+                    similarity_score=score,
+                    reason=reason,
+                )
+
+                self._add_link(
+                    source_memory_id=old_note.id,
+                    target_memory_id=new_note.id,
+                    similarity_score=score,
+                    reason=reason,
+                )
     def _get_note_by_id(
         self,
         notes: List[MemoryNote],
@@ -267,3 +288,30 @@ class AMemMemoryService(BaseMemoryService):
             old_note.context = new_context
     def get_revision_history(self, memory_id: str) -> list[MemoryRevision]:
         return self._revisions.get(memory_id, [])
+    def _add_link(
+        self,
+        source_memory_id: str,
+        target_memory_id: str,
+        similarity_score: float,
+        reason: str,
+    ) -> None:
+        link = MemoryLink(
+            id=str(uuid4()),
+            source_memory_id=source_memory_id,
+            target_memory_id=target_memory_id,
+            similarity_score=similarity_score,
+            reason=reason,
+        )
+
+        if source_memory_id not in self._links:
+            self._links[source_memory_id] = []
+
+        already_exists = any(
+            existing.target_memory_id == target_memory_id
+            for existing in self._links[source_memory_id]
+        )
+
+        if not already_exists:
+            self._links[source_memory_id].append(link)
+    def get_links(self, memory_id: str) -> list[MemoryLink]:
+        return self._links.get(memory_id, [])
