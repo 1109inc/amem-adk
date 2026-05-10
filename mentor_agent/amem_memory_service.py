@@ -9,6 +9,7 @@ from google.adk.memory.base_memory_service import (
     MemoryEntry,
 )
 from datetime import datetime, timezone
+import math
 from mentor_agent.llm_link_judge import LLMLinkJudge
 from google.adk.sessions import Session
 from google.genai import types
@@ -133,7 +134,11 @@ class AMemMemoryService(BaseMemoryService):
             return SearchMemoryResponse(memories=[])
 
         query_embedding = self._embedder.embed_text(query)
+        now = datetime.now(timezone.utc)
 
+        for note in memories:
+            note.retention_score = self._calculate_retention_score(note, now)
+            await self._repo.save_note(note)
         scored_notes = []
         for note in memories:
             score = cosine_similarity(query_embedding, note.embedding)
@@ -156,6 +161,7 @@ class AMemMemoryService(BaseMemoryService):
             note.access_count += 1
             note.last_accessed_at = now
             note.memory_strength += 1.0
+            note.retention_score = self._calculate_retention_score(note, now)
             await self._repo.save_note(note)
         entries = [
             MemoryEntry(
@@ -398,3 +404,19 @@ class AMemMemoryService(BaseMemoryService):
         return self._links.get(memory_id, [])
     async def initialize(self) -> None:
         await init_db()
+    def _calculate_retention_score(
+        self,
+        note: MemoryNote,
+        now: datetime,
+    ) -> float:
+        reference_time = note.last_accessed_at or note.timestamp
+
+        if reference_time.tzinfo is None:
+            reference_time = reference_time.replace(tzinfo=timezone.utc)
+
+        elapsed_seconds = max((now - reference_time).total_seconds(), 0)
+        elapsed_days = elapsed_seconds / 86400
+
+        memory_strength = max(note.memory_strength, 1.0)
+
+        return math.exp(-elapsed_days / memory_strength)
