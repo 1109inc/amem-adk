@@ -1,7 +1,12 @@
 from google.adk.agents.llm_agent import Agent
 from google.adk.tools.load_memory_tool import LoadMemoryTool
+from google.adk.models.lite_llm import LiteLlm
+
+
+model=LiteLlm(model="openai/gpt-4o-mini")
+
 root_agent = Agent(
-    model='gemini-flash-lite-latest',
+    model=model,
     name='mentor_agent',
     description="A research project mentor that helps with architecture, tradeoffs, and implementation planning.",
     instruction="""

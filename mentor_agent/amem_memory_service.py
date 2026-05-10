@@ -472,3 +472,63 @@ class AMemMemoryService(BaseMemoryService):
                 best_note = old_note
 
         return best_note, best_score
+    async def search_memory_vector_only(
+        self,
+        *,
+        app_name: str,
+        user_id: str,
+        query: str,
+        top_k: int = 5,
+    ) -> SearchMemoryResponse:
+        """
+        Baseline retrieval method.
+
+        This uses only embedding cosine similarity.
+        It does NOT use:
+        - graph expansion
+        - links
+        - memory evolution
+        - retention/confidence/importance scoring
+
+        This is useful for comparing plain vector memory vs A-Mem retrieval.
+        """
+        memories = await self._repo.load_notes(app_name=app_name, user_id=user_id)
+
+        if not memories:
+            return SearchMemoryResponse(memories=[])
+
+        query_embedding = self._embedder.embed_text(query)
+
+        scored_notes = []
+
+        for note in memories:
+            if not note.embedding or len(note.embedding) != len(query_embedding):
+                continue
+
+            score = cosine_similarity(query_embedding, note.embedding)
+            scored_notes.append((score, note))
+
+        scored_notes.sort(key=lambda item: item[0], reverse=True)
+
+        top_notes = [
+            (score, note)
+            for score, note in scored_notes[:top_k]
+            if score > 0.2
+        ]
+
+        entries = [
+            MemoryEntry(
+                content=types.Content(
+                    role="model",
+                    parts=[
+                        types.Part(
+                            text=f"Vector Score: {score:.4f}\n{self._format_note_for_agent(note)}"
+                        )
+                    ],
+                ),
+                author="vector_only_memory",
+            )
+            for score, note in top_notes
+        ]
+
+        return SearchMemoryResponse(memories=entries)
