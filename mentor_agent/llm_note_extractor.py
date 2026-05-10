@@ -37,9 +37,12 @@ Given the source memory text, extract:
 
 Rules:
 - Do not invent facts.
-- Do not rewrite the source memory as truth beyond what it says.
-- Keep keywords short.
-- Keep tags snake_case.
+- Prefer terms explicitly present in the source text.
+- Do not include technologies that are only mentioned as examples unless they are central to the memory.
+- Maximum 6 keywords.
+- Maximum 4 tags.
+- Context must be one short sentence.
+- Tags must be snake_case.
 - Return ONLY valid JSON.
 
 Source memory text:
@@ -73,7 +76,7 @@ JSON format:
             data = json.loads(cleaned)
 
         return ExtractedNoteMetadata(
-            keywords=data.get("keywords", []),
-            tags=data.get("tags", []),
+            keywords=data.get("keywords", [])[:6],
+            tags=data.get("tags", [])[:4],
             context=data.get("context", ""),
         )
