@@ -8,6 +8,7 @@ from google.adk.memory.base_memory_service import (
     SearchMemoryResponse,
     MemoryEntry,
 )
+from datetime import datetime, timezone
 from mentor_agent.llm_link_judge import LLMLinkJudge
 from google.adk.sessions import Session
 from google.genai import types
@@ -84,6 +85,9 @@ class AMemMemoryService(BaseMemoryService):
                     context,
                 ]
             )
+            source_type = "user_message" if event.author == "user" else "agent_message"
+            confidence = 1.0 if event.author == "user" else 0.75
+            source_id = getattr(event, "id", None)
             note = MemoryNote(
                 id=str(uuid4()),
                 app_name=session.app_name,
@@ -94,6 +98,10 @@ class AMemMemoryService(BaseMemoryService):
                 tags=tags,
                 context=context,
                 embedding=self._embedder.embed_text(embedding_text),
+                source_type=source_type,
+                source_id=source_id,
+                confidence=confidence,
+
             )
 
             await self._link_related_memories(
@@ -142,6 +150,12 @@ class AMemMemoryService(BaseMemoryService):
             top_notes=top_notes,
             all_notes=memories,
         )
+        returned_notes = expanded_notes[:5]
+        now = datetime.now(timezone.utc)
+        for _, note in returned_notes:
+            note.access_count += 1
+            note.last_accessed_at = now
+            await self._repo.save_note(note)
         entries = [
             MemoryEntry(
                 content=types.Content(
@@ -154,7 +168,7 @@ class AMemMemoryService(BaseMemoryService):
                 ),
                 author="simple_memory",
             )
-            for score, note in expanded_notes[:5]
+            for score, note in returned_notes
         ]
 
         return SearchMemoryResponse(memories=entries)
