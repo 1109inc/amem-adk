@@ -18,6 +18,7 @@ from mentor_agent.memory_link import MemoryLink
 from mentor_agent.memory_repository import MemoryRepository
 from mentor_agent.database import init_db
 from mentor_agent.llm_note_extractor import LLMNoteExtractor
+from mentor_agent.llm_memory_evolver import LLMMemoryEvolver
 
 class AMemMemoryService(BaseMemoryService):
     """
@@ -43,6 +44,7 @@ class AMemMemoryService(BaseMemoryService):
         self._repo = MemoryRepository()
         self._llm_extractor = LLMNoteExtractor()
         self._link_judge = LLMLinkJudge()
+        self._memory_evolver = LLMMemoryEvolver()
 
     async def add_session_to_memory(self, session: Session) -> None:
         key = (session.app_name, session.user_id)
@@ -283,13 +285,29 @@ class AMemMemoryService(BaseMemoryService):
             old_tags = list(old_note.tags)
             old_context = old_note.context
 
-            merged_keywords = sorted(set(old_note.keywords + new_note.keywords))
-            merged_tags = sorted(set(old_note.tags + new_note.tags))
+            try:
+                evolved = self._memory_evolver.evolve(
+                old_content=old_note.content,
+                old_keywords=old_note.keywords,
+                old_tags=old_note.tags,
+                old_context=old_note.context,
+                new_content=new_note.content,
+                new_keywords=new_note.keywords,
+                new_tags=new_note.tags,
+                new_context=new_note.context,
+                )
 
-            new_context = (
-                "This memory is connected to related memories about "
-                f"keywords={merged_keywords} and tags={merged_tags}."
-            )
+                merged_keywords = evolved.keywords
+                merged_tags = evolved.tags
+                new_context = evolved.context
+
+            except Exception:
+                merged_keywords = sorted(set(old_note.keywords + new_note.keywords))
+                merged_tags = sorted(set(old_note.tags + new_note.tags))
+                new_context = (
+                    "This memory is connected to related memories about "
+                    f"keywords={merged_keywords} and tags={merged_tags}."
+                )
 
             # If nothing changed, do not create a revision.
             if (
