@@ -26,6 +26,7 @@ Build an ADK agent that can remember, connect, retrieve, and evolve project know
 * Source-aware confidence scoring for user and agent messages
 * Access tracking with `access_count` and `last_accessed_at`
 * Memory reinforcement with `memory_strength`
+* Ebbinghaus-style retention score calculation
 * Retention-aware ranking using semantic similarity, retention, confidence, and importance
 * Duplicate memory reinforcement instead of repeatedly storing near-identical memories
 * ADK `load_memory` tool integration
@@ -43,9 +44,11 @@ Build an ADK agent that can remember, connect, retrieve, and evolve project know
 8. Approved links are stored as `MemoryLink` records with similarity scores and reasons.
 9. Linked memories are evolved by an LLM without rewriting original source content.
 10. Every evolution creates a `MemoryRevision` record.
-11. Search uses semantic similarity, retention, confidence, importance, and graph-expanded retrieval.
-12. Notes, links, and revisions are persisted in SQLite.
-13. The ADK agent can call `load_memory`, which routes memory search through the custom `AMemMemoryService`.
+11. Search calculates retention and ranks memories using semantic similarity, retention, confidence, and importance.
+12. Search expands through linked memories to retrieve supporting context.
+13. Retrieved memories are reinforced by updating `access_count`, `last_accessed_at`, and `memory_strength`.
+14. Notes, links, and revisions are persisted in SQLite.
+15. The ADK agent can call `load_memory`, which routes memory search through the custom `AMemMemoryService`.
 
 ## Current Safety Design
 
@@ -56,6 +59,30 @@ Build an ADK agent that can remember, connect, retrieve, and evolve project know
 * User messages and agent messages have different `source_type` and confidence values.
 * Memory notes include provenance and lifecycle fields such as `source_type`, `source_id`, `confidence`, `is_derived`, `evidence_memory_ids`, `access_count`, `last_accessed_at`, `expires_at`, `importance`, `memory_strength`, and `retention_score`.
 * Repeated or near-duplicate memories reinforce existing memories instead of creating duplicate memory records.
+* Expired memories are not yet filtered, but the schema includes `expires_at` for future hard-expiration support.
+
+## Retention / Forgetting Foundation
+
+The project includes an Ebbinghaus-style retention calculation:
+
+```text
+retention = e^(-elapsed_days / memory_strength)
+```
+
+Older memories decay over time, while retrieved memories are reinforced by increasing `memory_strength` and updating `last_accessed_at`.
+
+A small test script verifies this behavior:
+
+```bash
+python test_retention_decay.py
+```
+
+Current behavior:
+
+* Old, unrecalled memories can have very low pre-access retention.
+* Retrieved memories are refreshed, so their retention returns close to `1.0`.
+* Each retrieval increases `access_count` and `memory_strength`.
+* Memories are not deleted yet; retention is currently used for scoring/ranking, not hard forgetting.
 
 ## Evaluation
 
@@ -111,6 +138,7 @@ This shows the benefit of graph-expanded retrieval: the system can recover suppo
 * Add stronger recency and access-count based ranking experiments
 * Add MemoryBank-style forgetting / decay policies
 * Add hard expiration filtering using `expires_at`
+* Save evaluation outputs to a reproducible results file
 * Add evaluation against MemoryBank-style baselines
 * Add Vertex AI Memory Bank comparison
 * Add a dashboard to inspect notes, links, revisions, retrieval scores, and evaluation results
