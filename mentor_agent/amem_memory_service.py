@@ -472,6 +472,86 @@ class AMemMemoryService(BaseMemoryService):
                 best_note = old_note
 
         return best_note, best_score
+    async def search_memory_decay_baseline(
+        self,
+        *,
+        app_name: str,
+        user_id: str,
+        query: str,
+        top_k: int = 5,
+    ) -> SearchMemoryResponse:
+        """
+    Decay-aware baseline retrieval method.
+
+    This uses:
+    - embedding cosine similarity
+    - Ebbinghaus-style retention score
+    - confidence
+    - importance
+
+    It does NOT use:
+    - graph expansion
+    - linked memory traversal
+    - memory evolution during retrieval
+
+    This is useful for comparing A-Mem graph retrieval
+    against a MemoryBank-style decay-aware baseline.
+    """
+        memories = await self._repo.load_notes(app_name=app_name, user_id=user_id)
+
+        if not memories:
+            return SearchMemoryResponse(memories=[])
+
+        query_embedding = self._embedder.embed_text(query)
+        now = datetime.now(timezone.utc)
+
+        scored_notes = []
+
+        for note in memories:
+            if not note.embedding or len(note.embedding) != len(query_embedding):
+                continue
+
+            note.retention_score = self._calculate_retention_score(note, now)
+            await self._repo.save_note(note)
+
+            semantic_score = cosine_similarity(query_embedding, note.embedding)
+
+            final_score = (
+                semantic_score * 0.75
+                + note.retention_score * 0.15
+                + note.confidence * 0.05
+                + note.importance * 0.05
+            )
+
+            scored_notes.append((final_score, note))
+
+        scored_notes.sort(key=lambda item: item[0], reverse=True)
+
+        top_notes = [
+            (score, note)
+            for score, note in scored_notes[:top_k]
+            if score > 0.2
+        ]
+
+        entries = [
+            MemoryEntry(
+                content=types.Content(
+                    role="model",
+                    parts=[
+                        types.Part(
+                            text=(
+                                f"Decay Baseline Score: {score:.4f}\n"
+                                f"{self._format_note_for_agent(note)}"
+                            )
+                        )
+                    ],
+                ),
+                author="decay_baseline_memory",
+            )
+            for score, note in top_notes
+        ]
+
+        return SearchMemoryResponse(memories=entries)
     async def search_memory_vector_only(
         self,
         *,

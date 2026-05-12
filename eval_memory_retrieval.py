@@ -72,14 +72,17 @@ def print_compact_response(title: str, response) -> None:
 def write_eval_results_markdown(
     *,
     direct_vector_hits: int,
+    direct_decay_hits: int,
     direct_amem_hits: int,
     direct_total: int,
     multi_vector_hits: int,
+    multi_decay_hits: int,
     multi_amem_hits: int,
     multi_total: int,
     query_results: list[dict],
 ) -> None:
     overall_vector_hits = direct_vector_hits + multi_vector_hits
+    overall_decay_hits = direct_decay_hits + multi_decay_hits
     overall_amem_hits = direct_amem_hits + multi_amem_hits
     overall_total = direct_total + multi_total
 
@@ -92,9 +95,9 @@ def write_eval_results_markdown(
         "",
         "| Evaluation Type | Vector-only | A-Mem |",
         "|---|---:|---:|",
-        f"| Direct retrieval | {direct_vector_hits}/{direct_total} | {direct_amem_hits}/{direct_total} |",
-        f"| Multi-hop retrieval | {multi_vector_hits}/{multi_total} | {multi_amem_hits}/{multi_total} |",
-        f"| Overall retrieval | {overall_vector_hits}/{overall_total} | {overall_amem_hits}/{overall_total} |",
+        f"| Direct retrieval | {direct_vector_hits}/{direct_total} |  {direct_decay_hits}/{direct_total} | {direct_amem_hits}/{direct_total} |",
+        f"| Multi-hop retrieval | {multi_vector_hits}/{multi_total} | {multi_decay_hits}/{multi_total} | {multi_amem_hits}/{multi_total} |",
+        f"| Overall retrieval | {overall_vector_hits}/{overall_total} | {overall_decay_hits}/{overall_total} | {overall_amem_hits}/{overall_total} |",
         "",
         "## Query Results",
         "",
@@ -107,16 +110,20 @@ def write_eval_results_markdown(
                 "",
                 f"- Expected terms: `{result['expected_terms']}`",
                 f"- Vector-only hit: `{result['vector_hit']}`",
+                f"- Decay baseline hit: `{result['decay_hit']}`",
                 f"- A-Mem hit: `{result['amem_hit']}`",
                 "",
                 "**Vector-only results:**",
                 "",
             ]
         )
+        
 
         for index, content in enumerate(result["vector_results"], start=1):
             lines.append(f"{index}. {content}")
-
+        lines.extend(["", "**Decay baseline results:**", ""])
+        for index, content in enumerate(result["decay_results"], start=1):
+            lines.append(f"{index}. {content}")
         lines.extend(["", "**A-Mem results:**", ""])
 
         for index, content in enumerate(result["amem_results"], start=1):
@@ -133,11 +140,11 @@ async def run_query_group(
     title: str,
     queries: list[dict],
     query_results: list[dict],
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int,int]:
     print("\n" + "#" * 100)
     print(title)
     print("#" * 100)
-
+    decay_hits = 0
     vector_hits = 0
     amem_hits = 0
 
@@ -150,7 +157,12 @@ async def run_query_group(
             query=query,
             top_k=3,
         )
-
+        decay_response = await memory_service.search_memory_decay_baseline(
+            app_name=APP_NAME,
+            user_id=USER_ID,
+            query=query,
+            top_k=3,
+        )
         amem_response = await memory_service.search_memory(
             app_name=APP_NAME,
             user_id=USER_ID,
@@ -161,6 +173,10 @@ async def run_query_group(
             vector_response,
             item["expected_terms"],
         )
+        decay_hit = response_contains_terms(
+            decay_response,
+            item["expected_terms"],
+        )
         amem_hit = response_contains_terms(
             amem_response,
             item["expected_terms"],
@@ -168,7 +184,8 @@ async def run_query_group(
 
         if vector_hit:
             vector_hits += 1
-
+        if decay_hit:
+            decay_hits += 1
         if amem_hit:
             amem_hits += 1
 
@@ -178,8 +195,10 @@ async def run_query_group(
                 "query": query,
                 "expected_terms": item["expected_terms"],
                 "vector_hit": vector_hit,
+                "decay_hit": decay_hit,
                 "amem_hit": amem_hit,
                 "vector_results": get_compact_contents(vector_response),
+                "decay_results": get_compact_contents(decay_response),
                 "amem_results": get_compact_contents(amem_response),
             }
         )
@@ -188,10 +207,12 @@ async def run_query_group(
         print(f"QUERY: {query}")
         print(f"EXPECTED TERMS: {item['expected_terms']}")
         print(f"\nVECTOR HIT: {vector_hit}")
+        print(f"DECAY HIT: {decay_hit}")
         print(f"A-MEM HIT: {amem_hit}")
         print("#" * 100)
 
         print_compact_response("VECTOR-ONLY BASELINE", vector_response)
+        print_compact_response("DECAY BASELINE", decay_response)
         print_compact_response("A-MEM GRAPH RETRIEVAL", amem_response)
 
     total = len(queries)
@@ -200,9 +221,10 @@ async def run_query_group(
     print(f"{title} SUMMARY")
     print("=" * 80)
     print(f"Vector-only hits: {vector_hits}/{total}")
+    print(f"Decay baseline hits: {decay_hits}/{total}")
     print(f"A-Mem hits: {amem_hits}/{total}")
 
-    return vector_hits, amem_hits, total
+    return vector_hits, decay_hits, amem_hits, total
 
 
 async def main():
@@ -300,14 +322,14 @@ async def main():
 
     query_results = []
 
-    direct_vector_hits, direct_amem_hits, direct_total = await run_query_group(
+    direct_vector_hits,direct_decay_hits,  direct_amem_hits, direct_total = await run_query_group(
         memory_service=memory_service,
         title="DIRECT RETRIEVAL EVALUATION",
         queries=direct_queries,
         query_results=query_results,
     )
 
-    multi_vector_hits, multi_amem_hits, multi_total = await run_query_group(
+    multi_vector_hits,multi_decay_hits, multi_amem_hits, multi_total = await run_query_group(
         memory_service=memory_service,
         title="MULTI-HOP RETRIEVAL EVALUATION",
         queries=multi_hop_queries,
@@ -315,6 +337,7 @@ async def main():
     )
 
     overall_vector_hits = direct_vector_hits + multi_vector_hits
+    overall_decay_hits = direct_decay_hits + multi_decay_hits
     overall_amem_hits = direct_amem_hits + multi_amem_hits
     overall_total = direct_total + multi_total
 
@@ -322,13 +345,16 @@ async def main():
     print("OVERALL EVALUATION SUMMARY")
     print("=" * 80)
     print(f"Vector-only hits: {overall_vector_hits}/{overall_total}")
+    print(f"Decay baseline hits: {overall_decay_hits}/{overall_total}")
     print(f"A-Mem hits: {overall_amem_hits}/{overall_total}")
 
     write_eval_results_markdown(
         direct_vector_hits=direct_vector_hits,
+        direct_decay_hits=direct_decay_hits,
         direct_amem_hits=direct_amem_hits,
         direct_total=direct_total,
         multi_vector_hits=multi_vector_hits,
+        multi_decay_hits=multi_decay_hits,
         multi_amem_hits=multi_amem_hits,
         multi_total=multi_total,
         query_results=query_results,
