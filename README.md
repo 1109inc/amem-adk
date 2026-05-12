@@ -99,11 +99,13 @@ The evaluation compares:
 
 ### Initial Results
 
-| Evaluation Type     | Vector-only | A-Mem |
-| ------------------- | ----------: | ----: |
-| Direct retrieval    |         4/4 |   4/4 |
-| Multi-hop retrieval |         2/3 |   3/3 |
-| Overall retrieval   |         6/7 |   7/7 |
+| Evaluation Type | Vector-only | Decay baseline | A-Mem |
+|---|---:|---:|---:|
+| Direct retrieval | 4/4 | 4/4 | 4/4 |
+| Multi-hop retrieval | 2/3 | 2/3 | 3/3 |
+| Overall retrieval | 6/7 | 6/7 | 7/7 |
+
+The decay baseline shows that retention-aware ranking alone does not solve multi-hop retrieval; A-Mem’s graph expansion retrieves linked supporting context that both vector-only and decay-aware retrieval can miss.
 
 Direct retrieval queries are easy for both systems. The multi-hop queries show the benefit of A-Mem graph expansion: linked memories provide supporting context that plain vector retrieval can miss.
 
